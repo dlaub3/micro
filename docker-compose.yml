@@ -1,0 +1,45 @@
+version: "2"
+services:
+  traefik:
+    restart: always
+    build:
+      context: .
+      dockerfile: traefik.Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - frontend
+      - backend
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./acme.json:/acme.json
+      - ./traefik.toml:/traefik.toml
+      - ./log:/tmp/log
+        
+  jenkins:
+    restart: always
+    build:
+      context: ./jenkins
+      dockerfile: jenkins.Dockerfile
+    ports:
+      - "8080"
+    networks:
+      - frontend
+    volumes:
+      - jenkins:/var/jenkins_home
+        # environment:
+        #   - "JENKINS_OPTS=--prefix=/jenkins"
+    labels:
+      - traefik.http.routers.build.rule=Host(`${JENKINSHOST}`)
+      - traefik.http.routers.build.tls.certresolver=myresolver
+      - traefik.http.routers.build.entrypoints=https
+      - traefik.http.services.build.loadbalancer.server.port=8080
+      - traefik.docker.network=traefik_frontend
+
+networks:
+  frontend:
+  backend:
+
+volumes:
+  jenkins:
